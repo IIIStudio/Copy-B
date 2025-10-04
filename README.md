@@ -4,4 +4,9 @@
 
 1. 支持拖拽
 
+例如：
+```txt
+https://iiistudio.github.io/Copy-B/img/merged_image.jpg
+```
+
 ![](./image/1.jpg)
