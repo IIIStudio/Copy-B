@@ -267,8 +267,10 @@
         description: '选择视频文件，生成合并的图片文件',
         content: `
           <div>
-            <img id="defaultPreview" src="./img/iii.jpg" class="media-preview">
+            <img id="defaultPreview" src="./img/iii.jpg" class="media-preview" title="点击更换图片">
           </div>
+          <!-- 隐藏的封面图片选择器 -->
+          <input type="file" id="coverImageFile" accept="image/*" class="hidden">
           
           <label for="videoFile" class="file-input-label">选择视频文件</label>
           <input type="file" id="videoFile" accept="video/*" class="hidden">
@@ -326,6 +328,7 @@
         let currentVideoBlob = null;
         let currentGeneratedBlob = null;
         let droppedVideoFile = null; // 拖拽到“文件生成工具”的视频文件
+        let customCoverImageBlob = null; // 用户自选的封面图片
         
         // 切换选项卡
         document.querySelectorAll('.tab').forEach(tab => {
@@ -702,6 +705,32 @@
             }
         });
         
+        // 点击生成面板图片以更换封面
+        (function() {
+            const previewImg = document.getElementById('defaultPreview');
+            const coverInput = document.getElementById('coverImageFile');
+            if (!previewImg || !coverInput) return;
+
+            previewImg.style.cursor = 'pointer';
+            previewImg.addEventListener('click', () => {
+                // 提示并打开文件选择
+                coverInput.click();
+            });
+
+            coverInput.addEventListener('change', async () => {
+                const file = coverInput.files && coverInput.files[0];
+                if (!file) return;
+                // 保存自定义封面并更新预览
+                customCoverImageBlob = file;
+                try {
+                    const objectUrl = URL.createObjectURL(file);
+                    previewImg.src = objectUrl;
+                    const statusEl = document.getElementById('generateStatus');
+                    if (statusEl) statusEl.textContent = `已选择封面图片：${file.name}`;
+                } catch (_) {}
+            });
+        })();
+
         // “文件生成工具”拖拽上传（整个面板区域可拖拽）
         (function() {
             const dropEl = document.getElementById('generate');
@@ -760,10 +789,16 @@
                     progressEl.style.width = `${metadata.percent}%`;
                 });
                 
-                // 3. 获取默认图片
-                statusEl.textContent = "正在获取默认图片...";
-                const imageResp = await fetch('./img/iii.jpg');
-                const imageBlob = await imageResp.blob();
+                // 3. 获取封面图片（优先使用用户选择的图片）
+                let imageBlob;
+                if (customCoverImageBlob) {
+                    statusEl.textContent = "已选择自定义图片，正在读取...";
+                    imageBlob = customCoverImageBlob;
+                } else {
+                    statusEl.textContent = "正在获取默认图片...";
+                    const imageResp = await fetch('./img/iii.jpg');
+                    imageBlob = await imageResp.blob();
+                }
                 
                 // 4. 合并文件
                 statusEl.textContent = "正在合并文件...";
