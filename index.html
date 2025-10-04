@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Copy /B</title>
+    <style>
+        body {
+            font-family: "Microsoft YaHei", sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+            background-color: #f5f5f5;
+        }
+        .container {
+        }
+        .tab-container {
+            display: flex;
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            background-color: #e0e0e0;
+            border-radius: 5px;
+            margin-right: 5px;
+        }
+        .tab.active {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .tab-content {
+            display: none;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 0 0 5px 5px;
+            background-color: white;
+        }
+        .tab-content.active {
+            display: block;
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+        }
+        .media-preview {
+            max-width: 100%;
+            max-height: 300px;
+            margin: 15px auto;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            display: block;
+        }
+        .video-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            margin: 15px auto;
+            background-color: #000;
+            border-radius: 5px;
+            overflow: hidden;
+            display: none;
+        }
+        .video-container video {
+            width: 100%;
+            height: auto;
+            max-height: 500px;
+            display: block;
+        }
+        .file-input-label, .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 20px;
+            min-width: 160px;
+            box-sizing: border-box;
+            white-space: nowrap;
+            background-color: #4CAF50;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 10px;
+            text-align: center;
+            border: none;
+            transition: background-color 0.3s;
+        }
+        .file-input-label:hover, .btn:hover {
+            background-color: #45a049;
+        }
+        .btn-secondary {
+            background-color: #2196F3;
+        }
+        .btn-secondary:hover {
+            background-color: #0b7dda;
+        }
+        .btn-danger {
+            background-color: #f44336;
+        }
+        .btn-danger:hover {
+            background-color: #da190b;
+        }
+        #status {
+            margin: 15px 0;
+            min-height: 20px;
+            color: #666;
+        }
+        .progress-container {
+            width: 100%;
+            background-color: #f1f1f1;
+            border-radius: 5px;
+            margin: 10px 0;
+            display: none;
+        }
+        .progress-bar {
+            height: 20px;
+            border-radius: 5px;
+            background-color: #4CAF50;
+            width: 0%;
+            transition: width 0.3s;
+        }
+        input[type="text"] {
+            padding: 10px;
+            width: 80%;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .hidden {
+            display: none;
+        }
+        .controls {
+            margin-top: 20px;
+        }
+        @media (max-width: 600px) {
+            .tab-container {
+                flex-direction: column;
+            }
+            .tab {
+                margin-right: 0;
+                margin-bottom: 5px;
+                border-radius: 5px;
+            }
+            input[type="text"] {
+                width: 95%;
+            }
+            .video-container {
+                max-height: 300px;
+            }
+        }
+
+        #generate .file-input-label,
+        #generate #generateBtn {
+            width: 150px !important;        
+            min-width: 150px !important;    
+            height: 40px !important;         
+            padding: 0 !important;          
+            margin: 10px !important;         
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            box-sizing: border-box !important;
+            line-height: 44px !important;    
+            font-size: 16px !important;
+            white-space: nowrap !important;
+            vertical-align: middle !important;
+        }
+        /* 拖拽高亮样式（作用于整个面板区域） */
+        .tab-content.drag-accept { position: relative; }
+        .tab-content.drag-accept.dragover {
+            border-color: #4CAF50 !important;
+            box-shadow: 0 0 0 2px #4CAF50 inset;
+            background: #f0fff4;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+</head>
+<body>
+
+    <script>
+    document.body.innerHTML = '';
+
+    // Create container
+    const container = document.createElement('div');
+    container.className = 'container';
+    document.body.appendChild(container);
+
+    // Create heading
+    //const h1 = document.createElement('h1');
+    //h1.textContent = '隐藏视频播放器';
+    //container.appendChild(h1);
+
+    // Create tab container
+    const tabContainer = document.createElement('div');
+    tabContainer.className = 'tab-container';
+    container.appendChild(tabContainer);
+
+    // Create tabs
+    const tabs = [
+      { text: '文件生成', tab: 'generate', active: true },
+      { text: '本地文件', tab: 'local', active: false },
+      { text: 'URL转换', tab: 'url', active: false }
+    ];
+
+    tabs.forEach(tabData => {
+      const tab = document.createElement('div');
+      tab.className = `tab ${tabData.active ? 'active' : ''}`;
+      tab.textContent = tabData.text;
+      tab.setAttribute('data-tab', tabData.tab);
+      tabContainer.appendChild(tab);
+    });
+
+    // Create tab contents
+    const tabContents = [
+      {
+        id: 'local',
+        active: false,
+        title: '本地文件提取',
+        description: '选择通过 copy /b 命令合并的图片+视频文件',
+        content: `
+          <label for="localFile" id="localChooseLabel" class="file-input-label">选择本地文件</label>
+          <input type="file" id="localFile" accept=".jpg,.jpeg,.png" class="hidden">
+          
+          <div id="localStatus" class="status">等待选择文件...</div>
+          <div class="progress-container" id="localProgressContainer">
+            <div id="localProgress" class="progress-bar"></div>
+          </div>
+          
+          <img id="localPreview" class="media-preview hidden">
+          <div class="video-container" id="localVideoContainer">
+            <video controls id="localVideoPlayer"></video>
+          </div>
+          
+          <div class="controls">
+            <button id="localDownloadBtn" class="btn btn-secondary hidden">下载视频</button>
+          </div>
+        `
+      },
+      {
+        id: 'url',
+        active: false,
+        title: 'URL转换工具',
+        description: '输入图片URL，提取隐藏视频',
+        content: `
+          <input type="text" id="imageUrl" placeholder="输入图片URL (如: https://example.com/image.jpg)">
+          
+          <button id="fetchUrlBtn" class="btn">提取视频</button>
+          
+          <div id="urlStatus" class="status">等待输入URL...</div>
+          <div class="progress-container" id="urlProgressContainer">
+            <div id="urlProgress" class="progress-bar"></div>
+          </div>
+          
+          <img id="urlPreview" class="media-preview hidden">
+          <div class="video-container" id="urlVideoContainer">
+            <video controls id="urlVideoPlayer"></video>
+          </div>
+          
+          <div class="controls">
+            <button id="urlDownloadBtn" class="btn btn-secondary hidden">下载视频</button>
+          </div>
+        `
+      },
+      {
+        id: 'generate',
+        active: true,
+        title: '文件生成工具',
+        description: '选择视频文件，生成合并的图片文件',
+        content: `
+          <div>
+            <img id="defaultPreview" src="https://pic2.ziyuan.wang/user/miss/2025/04/hifini_103fcd33918c1.png" class="media-preview">
+          </div>
+          
+          <label for="videoFile" class="file-input-label">选择视频文件</label>
+          <input type="file" id="videoFile" accept="video/*" class="hidden">
+          
+          <button id="generateBtn" class="btn">生成合并图片</button>
+          
+          <div id="generateStatus" class="status">等待选择视频文件...</div>
+          <div class="progress-container" id="generateProgressContainer">
+            <div id="generateProgress" class="progress-bar"></div>
+          </div>
+          
+          <div class="controls">
+            <button id="generateDownloadBtn" class="btn btn-secondary hidden">下载合并图片</button>
+          </div>
+        `
+      }
+    ];
+
+    tabContents.forEach(contentData => {
+      const content = document.createElement('div');
+      content.id = contentData.id;
+      content.className = `tab-content ${contentData.active ? 'active' : ''}`;
+      
+      const h2 = document.createElement('h2');
+      h2.textContent = contentData.title;
+      if (contentData.id === 'local') h2.id = 'localTitle';
+      content.appendChild(h2);
+      
+      const p = document.createElement('p');
+      p.textContent = contentData.description;
+      if (contentData.id === 'local') p.id = 'localDesc';
+      content.appendChild(p);
+      
+      content.innerHTML += contentData.content;
+      container.appendChild(content);
+    });
+
+    // Add tab switching functionality
+    const tabsElements = document.querySelectorAll('.tab');
+    tabsElements.forEach(tab => {
+      tab.addEventListener('click', () => {
+        // Remove active class from all tabs and contents
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        
+        // Add active class to clicked tab and corresponding content
+        tab.classList.add('active');
+        const tabId = tab.getAttribute('data-tab');
+        document.getElementById(tabId).classList.add('active');
+      });
+    });
+        // 全局变量
+        let currentVideoBlob = null;
+        let currentGeneratedBlob = null;
+        let droppedVideoFile = null; // 拖拽到“文件生成工具”的视频文件
+        
+        // 切换选项卡
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                
+                tab.classList.add('active');
+                document.getElementById(tab.dataset.tab).classList.add('active');
+            });
+        });
+        
+        // 本地文件处理
+        document.getElementById('localFile').addEventListener('change', async function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const statusEl = document.getElementById('localStatus');
+            const progressContainer = document.getElementById('localProgressContainer');
+            const progressEl = document.getElementById('localProgress');
+            const videoContainer = document.getElementById('localVideoContainer');
+            const videoPlayer = document.getElementById('localVideoPlayer');
+            const previewImg = document.getElementById('localPreview');
+            const downloadBtn = document.getElementById('localDownloadBtn');
+            
+            // 重置状态
+            statusEl.textContent = "正在处理文件...";
+            progressContainer.style.display = 'block';
+            progressEl.style.width = '0%';
+            videoContainer.style.display = 'none';
+            downloadBtn.classList.add('hidden');
+            currentVideoBlob = null;
+            
+            try {
+                // 显示预览图片
+                previewImg.src = URL.createObjectURL(file);
+                previewImg.classList.remove('hidden');
+                
+                // 1. 读取文件内容
+                const arrayBuffer = await file.arrayBuffer();
+                progressEl.style.width = '20%';
+                
+                // 2. 查找ZIP文件起始位置
+                statusEl.textContent = "正在查找隐藏内容...";
+                const uint8Array = new Uint8Array(arrayBuffer);
+                let zipStart = -1;
+                
+                // 查找ZIP文件头 (PK\x03\x04)
+                for (let i = 0; i < uint8Array.length - 4; i++) {
+                    if (uint8Array[i] === 0x50 && uint8Array[i+1] === 0x4B && 
+                        uint8Array[i+2] === 0x03 && uint8Array[i+3] === 0x04) {
+                        zipStart = i;
+                        break;
+                    }
+                }
+                
+                if (zipStart === -1) throw new Error("未检测到隐藏内容");
+                progressEl.style.width = '40%';
+                
+                // 3. 提取ZIP部分
+                statusEl.textContent = "正在提取隐藏数据...";
+                const zipData = arrayBuffer.slice(zipStart);
+                progressEl.style.width = '60%';
+                
+                // 4. 使用JSZip解析ZIP
+                statusEl.textContent = "正在解析内容...";
+                const zip = await JSZip.loadAsync(zipData);
+                progressEl.style.width = '80%';
+                
+                // 5. 查找视频文件
+                statusEl.textContent = "正在查找视频文件...";
+                let videoFile = null;
+                const videoExtensions = ['.mp4', '.webm', '.ogg', '.mov', '.avi', '.mkv'];
+                
+                for (const [name, file] of Object.entries(zip.files)) {
+                    if (!file.dir && videoExtensions.some(ext => name.toLowerCase().endsWith(ext))) {
+                        videoFile = file;
+                        break;
+                    }
+                }
+                
+                if (!videoFile) throw new Error("未找到支持的视频文件");
+                
+                // 6. 提取视频内容
+                statusEl.textContent = "正在提取视频...";
+                const videoData = await videoFile.async('blob');
+                currentVideoBlob = videoData;
+                progressEl.style.width = '100%';
+                
+                // 7. 播放视频
+                videoPlayer.src = URL.createObjectURL(videoData);
+                videoContainer.style.display = 'block';
+                downloadBtn.classList.remove('hidden');
+                
+                statusEl.textContent = `已加载: ${videoFile.name}`;
+                
+                // 成功后：隐藏标题、描述、选择按钮与预览图，仅保留文件名与视频
+                const lt = document.getElementById('localTitle');
+                const ld = document.getElementById('localDesc');
+                const ll = document.getElementById('localChooseLabel');
+                if (lt) lt.style.display = 'none';
+                if (ld) ld.style.display = 'none';
+                if (ll) ll.style.display = 'none';
+                previewImg.classList.add('hidden');
+
+                // 自动播放
+                videoPlayer.play().catch(e => {
+                    statusEl.textContent += " (点击播放按钮开始播放)";
+                });
+                
+            } catch (error) {
+                console.error("处理失败:", error);
+                statusEl.textContent = `错误: ${error.message}`;
+                progressEl.style.width = '0%';
+                videoContainer.style.display = 'none';
+            } finally {
+                setTimeout(() => {
+                    progressContainer.style.display = 'none';
+                }, 500);
+            }
+        });
+        
+        // 本地图片拖拽上传（整个面板区域可拖拽）
+        (function() {
+            const dropEl = document.getElementById('local');
+            if (!dropEl) return;
+            dropEl.classList.add('drag-accept');
+            const isImage = (file) => {
+                const name = (file.name || '').toLowerCase();
+                return file.type.startsWith('image/') || name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.png');
+            };
+            const prevent = (e) => { e.preventDefault(); e.stopPropagation(); };
+
+            ['dragenter','dragover'].forEach(ev => {
+                dropEl.addEventListener(ev, (e) => { prevent(e); dropEl.classList.add('dragover'); });
+            });
+            ['dragleave','drop'].forEach(ev => {
+                dropEl.addEventListener(ev, (e) => { prevent(e); dropEl.classList.remove('dragover'); });
+            });
+
+            dropEl.addEventListener('drop', async (e) => {
+                const file = e.dataTransfer?.files?.[0];
+                if (!file) return;
+                if (!isImage(file)) {
+                    alert('请拖入 JPG/PNG 图片文件');
+                    return;
+                }
+
+                const statusEl = document.getElementById('localStatus');
+                const progressContainer = document.getElementById('localProgressContainer');
+                const progressEl = document.getElementById('localProgress');
+                const videoContainer = document.getElementById('localVideoContainer');
+                const videoPlayer = document.getElementById('localVideoPlayer');
+                const previewImg = document.getElementById('localPreview');
+                const downloadBtn = document.getElementById('localDownloadBtn');
+                currentVideoBlob = null;
+
+                try {
+                    statusEl.textContent = "正在处理文件...";
+                    progressContainer.style.display = 'block';
+                    progressEl.style.width = '0%';
+                    videoContainer.style.display = 'none';
+                    downloadBtn.classList.add('hidden');
+
+                    // 预览图片
+                    previewImg.src = URL.createObjectURL(file);
+                    previewImg.classList.remove('hidden');
+
+                    // 读取内容
+                    const arrayBuffer = await file.arrayBuffer();
+                    progressEl.style.width = '20%';
+
+                    // 查找 ZIP 头
+                    statusEl.textContent = "正在查找隐藏内容...";
+                    const uint8Array = new Uint8Array(arrayBuffer);
+                    let zipStart = -1;
+                    for (let i = 0; i < uint8Array.length - 4; i++) {
+                        if (uint8Array[i] === 0x50 && uint8Array[i+1] === 0x4B && uint8Array[i+2] === 0x03 && uint8Array[i+3] === 0x04) {
+                            zipStart = i;
+                            break;
+                        }
+                    }
+                    if (zipStart === -1) throw new Error("未检测到隐藏内容");
+                    progressEl.style.width = '40%';
+
+                    // 提取/解析 ZIP
+                    statusEl.textContent = "正在提取隐藏数据...";
+                    const zipData = arrayBuffer.slice(zipStart);
+                    progressEl.style.width = '60%';
+                    statusEl.textContent = "正在解析内容...";
+                    const zip = await JSZip.loadAsync(zipData);
+                    progressEl.style.width = '80%';
+
+                    // 查找视频
+                    statusEl.textContent = "正在查找视频文件...";
+                    let videoFile = null;
+                    const videoExtensions = ['.mp4', '.webm', '.ogg', '.mov', '.avi', '.mkv'];
+                    for (const [name, zf] of Object.entries(zip.files)) {
+                        if (!zf.dir && videoExtensions.some(ext => name.toLowerCase().endsWith(ext))) {
+                            videoFile = zf;
+                            break;
+                        }
+                    }
+                    if (!videoFile) throw new Error("未找到支持的视频文件");
+
+                    // 提取视频
+                    statusEl.textContent = "正在提取视频...";
+                    const videoData = await videoFile.async('blob');
+                    currentVideoBlob = videoData;
+                    progressEl.style.width = '100%';
+
+                    // 播放展示
+                    videoPlayer.src = URL.createObjectURL(videoData);
+                    videoContainer.style.display = 'block';
+                    downloadBtn.classList.remove('hidden');
+                    statusEl.textContent = `已加载: ${videoFile.name}`;
+
+                    // 成功后：隐藏标题、描述、选择按钮与预览图，仅保留文件名与视频
+                    const lt = document.getElementById('localTitle');
+                    const ld = document.getElementById('localDesc');
+                    const ll = document.getElementById('localChooseLabel');
+                    if (lt) lt.style.display = 'none';
+                    if (ld) ld.style.display = 'none';
+                    if (ll) ll.style.display = 'none';
+                    previewImg.classList.add('hidden');
+
+                    videoPlayer.play().catch(() => {
+                        statusEl.textContent += " (点击播放按钮开始播放)";
+                    });
+                } catch (err) {
+                    console.error('拖拽处理失败:', err);
+                    statusEl.textContent = `错误: ${err.message}`;
+                    progressEl.style.width = '0%';
+                    videoContainer.style.display = 'none';
+                } finally {
+                    setTimeout(() => { progressContainer.style.display = 'none'; }, 500);
+                }
+            });
+        })();
+
+        // 本地文件下载
+        document.getElementById('localDownloadBtn').addEventListener('click', function() {
+            if (currentVideoBlob) {
+                saveAs(currentVideoBlob, 'extracted_video.mp4');
+            }
+        });
+        
+        // URL转换处理
+        document.getElementById('fetchUrlBtn').addEventListener('click', async function() {
+            const imageUrl = document.getElementById('imageUrl').value.trim();
+            
+            if (!imageUrl) {
+                alert("请输入图片URL");
+                return;
+            }
+            
+            const statusEl = document.getElementById('urlStatus');
+            const progressContainer = document.getElementById('urlProgressContainer');
+            const progressEl = document.getElementById('urlProgress');
+            const videoContainer = document.getElementById('urlVideoContainer');
+            const videoPlayer = document.getElementById('urlVideoPlayer');
+            const previewImg = document.getElementById('urlPreview');
+            const downloadBtn = document.getElementById('urlDownloadBtn');
+            
+            // 重置状态
+            statusEl.textContent = "正在获取图片...";
+            progressContainer.style.display = 'block';
+            progressEl.style.width = '0%';
+            videoContainer.style.display = 'none';
+            downloadBtn.classList.add('hidden');
+            currentVideoBlob = null;
+            
+            try {
+                // 显示预览图片
+                previewImg.src = imageUrl;
+                previewImg.classList.remove('hidden');
+                
+                // 1. 获取图片
+                const response = await fetch(imageUrl);
+                if (!response.ok) throw new Error(`获取图片失败: ${response.status}`);
+                
+                progressEl.style.width = '20%';
+                
+                // 2. 读取图片内容
+                const arrayBuffer = await response.arrayBuffer();
+                progressEl.style.width = '40%';
+                
+                // 3. 查找ZIP文件起始位置
+                statusEl.textContent = "正在查找隐藏内容...";
+                const uint8Array = new Uint8Array(arrayBuffer);
+                let zipStart = -1;
+                
+                for (let i = 0; i < uint8Array.length - 4; i++) {
+                    if (uint8Array[i] === 0x50 && uint8Array[i+1] === 0x4B && 
+                        uint8Array[i+2] === 0x03 && uint8Array[i+3] === 0x04) {
+                        zipStart = i;
+                        break;
+                    }
+                }
+                
+                if (zipStart === -1) throw new Error("未检测到隐藏内容");
+                progressEl.style.width = '60%';
+                
+                // 4. 提取ZIP部分
+                statusEl.textContent = "正在提取隐藏数据...";
+                const zipData = arrayBuffer.slice(zipStart);
+                progressEl.style.width = '80%';
+                
+                // 5. 使用JSZip解析ZIP
+                statusEl.textContent = "正在解析内容...";
+                const zip = await JSZip.loadAsync(zipData);
+                
+                // 6. 查找视频文件
+                statusEl.textContent = "正在查找视频文件...";
+                let videoFile = null;
+                const videoExtensions = ['.mp4', '.webm', '.ogg', '.mov', '.avi', '.mkv'];
+                
+                for (const [name, file] of Object.entries(zip.files)) {
+                    if (!file.dir && videoExtensions.some(ext => name.toLowerCase().endsWith(ext))) {
+                        videoFile = file;
+                        break;
+                    }
+                }
+                
+                if (!videoFile) throw new Error("未找到支持的视频文件");
+                
+                // 7. 提取视频内容
+                statusEl.textContent = "正在提取视频...";
+                const videoData = await videoFile.async('blob');
+                currentVideoBlob = videoData;
+                progressEl.style.width = '100%';
+                
+                // 8. 播放视频
+                videoPlayer.src = URL.createObjectURL(videoData);
+                videoContainer.style.display = 'block';
+                downloadBtn.classList.remove('hidden');
+                
+                statusEl.textContent = `已加载: ${videoFile.name}`;
+                
+                // 自动播放
+                videoPlayer.play().catch(e => {
+                    statusEl.textContent += " (点击播放按钮开始播放)";
+                });
+                
+            } catch (error) {
+                console.error("处理失败:", error);
+                statusEl.textContent = `错误: ${error.message}`;
+                progressEl.style.width = '0%';
+                videoContainer.style.display = 'none';
+            } finally {
+                setTimeout(() => {
+                    progressContainer.style.display = 'none';
+                }, 500);
+            }
+        });
+        
+        // URL文件下载
+        document.getElementById('urlDownloadBtn').addEventListener('click', function() {
+            if (currentVideoBlob) {
+                saveAs(currentVideoBlob, 'extracted_video.mp4');
+            }
+        });
+        
+        // “文件生成工具”拖拽上传（整个面板区域可拖拽）
+        (function() {
+            const dropEl = document.getElementById('generate');
+            if (!dropEl) return;
+            dropEl.classList.add('drag-accept');
+            const isVideo = (file) => file.type.startsWith('video/');
+
+            const prevent = (e) => { e.preventDefault(); e.stopPropagation(); };
+            ['dragenter','dragover'].forEach(ev => {
+                dropEl.addEventListener(ev, (e) => { prevent(e); dropEl.classList.add('dragover'); });
+            });
+            ['dragleave','drop'].forEach(ev => {
+                dropEl.addEventListener(ev, (e) => { prevent(e); dropEl.classList.remove('dragover'); });
+            });
+
+            dropEl.addEventListener('drop', (e) => {
+                const file = e.dataTransfer?.files?.[0];
+                if (!file) return;
+                if (!isVideo(file)) {
+                    alert('请拖入视频文件');
+                    return;
+                }
+                droppedVideoFile = file;
+                const statusEl = document.getElementById('generateStatus');
+                statusEl.textContent = `已选择（拖拽）：${file.name}`;
+            });
+        })();
+
+        // 文件生成处理
+        document.getElementById('generateBtn').addEventListener('click', async function() {
+            const videoFileInput = document.getElementById('videoFile');
+            const statusEl = document.getElementById('generateStatus');
+            const progressEl = document.getElementById('generateProgress');
+            const progressContainer = document.getElementById('generateProgressContainer');
+            const downloadBtn = document.getElementById('generateDownloadBtn');
+            const videoFile = videoFileInput.files[0] || droppedVideoFile;
+
+            if (!videoFile) {
+                alert("请选择或拖拽视频文件");
+                return;
+            }
+
+            try {
+                statusEl.textContent = "正在准备生成文件...";
+                progressContainer.style.display = 'block';
+                progressEl.style.width = '0%';
+                downloadBtn.classList.add('hidden');
+                
+                // 1. 创建ZIP
+                const zip = new JSZip();
+                zip.file(videoFile.name, videoFile);
+                
+                // 2. 生成ZIP
+                statusEl.textContent = "正在生成ZIP文件...";
+                const zipBlob = await zip.generateAsync({type: 'blob'}, (metadata) => {
+                    progressEl.style.width = `${metadata.percent}%`;
+                });
+                
+                // 3. 获取默认图片
+                statusEl.textContent = "正在获取默认图片...";
+                const imageResp = await fetch('./img/iii.jpg');
+                const imageBlob = await imageResp.blob();
+                
+                // 4. 合并文件
+                statusEl.textContent = "正在合并文件...";
+                const mergedBlob = new Blob([
+                    await imageBlob.arrayBuffer(),
+                    await zipBlob.arrayBuffer()
+                ], { type: 'image/jpeg' });
+
+                currentGeneratedBlob = mergedBlob;
+                statusEl.textContent = "生成成功！";
+                downloadBtn.classList.remove('hidden');
+
+            } catch (error) {
+                console.error("生成失败:", error);
+                statusEl.textContent = `错误: ${error.message}`;
+                progressEl.style.width = '0%';
+            } finally {
+                setTimeout(() => {
+                    progressContainer.style.display = 'none';
+                }, 500);
+            }
+        });
+        
+        // 生成文件下载
+        document.getElementById('generateDownloadBtn').addEventListener('click', function() {
+            if (currentGeneratedBlob) {
+                saveAs(currentGeneratedBlob, 'merged_image.jpg');
+            }
+        });
+    // 全局拦截，避免把文件拖到页面其它区域时被浏览器直接打开
+    (function() {
+        const prevent = (e) => { e.preventDefault(); e.stopPropagation(); };
+        window.addEventListener('dragover', prevent);
+        window.addEventListener('drop', prevent);
+    })();
+    </script>
+    <style>
+        .corner-links {
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            display: flex;
+            align-items: center;
+            z-index: 9999;
+        }
+        .corner-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 10px;
+            border-radius: 8px;
+            color: #212529;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+        .corner-link:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+        }
+        .corner-link img,
+        .corner-link svg {
+            width: 22px;
+            height: 22px;
+        }
+        .corner-link .label {
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+    </style>
+    <div class="corner-links" aria-label="页面固定链接">
+        <a class="corner-link" href="https://github.com/IIIStudio/Copy-B" target="_blank" rel="noopener noreferrer" aria-label="前往 GitHub 仓库">
+            <!-- 内联 GitHub 图标，避免外部资源依赖 -->
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+                <path fill="#24292F" d="M12 .5a12 12 0 0 0-3.79 23.41c.6.11.82-.26.82-.58v-2.02c-3.35.73-4.06-1.61-4.06-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.09-.75.08-.74.08-.74 1.2.09 1.83 1.23 1.83 1.23 1.07 1.83 2.8 1.3 3.49.99.11-.78.42-1.3.76-1.6-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.13-.3-.54-1.51.12-3.15 0 0 1.01-.32 3.3 1.23.96-.27 1.99-.4 3.01-.4s2.05.14 3.01.4c2.29-1.55 3.3-1.23 3.3-1.23.66 1.64.25 2.85.12 3.15.77.84 1.24 1.91 1.24 3.22 0 4.61-2.8 5.63-5.47 5.93.43.37.81 1.1.81 2.22v3.29c0 .32.22.7.83.58A12 12 0 0 0 12 .5Z"/>
+            </svg>
+            <span class="label">Copy-B</span>
+        </a>
+        <a class="corner-link" href="https://cnb.cool/IIIStudio/HTML/Copy-B/" target="_blank" rel="noopener noreferrer" aria-label="前往 Copy-B 文档页面">
+            <img src="https://docs.cnb.cool/images/logo/svg/LogoColorfulIcon.svg" alt="CNB Logo">
+        </a>
+    </div>
+</body>
+</html>
