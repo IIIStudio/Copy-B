@@ -267,7 +267,7 @@
         description: '选择视频文件，生成合并的图片文件',
         content: `
           <div>
-            <img id="defaultPreview" src="https://pic2.ziyuan.wang/user/miss/2025/04/hifini_103fcd33918c1.png" class="media-preview" title="点击更换图片">
+            <img id="defaultPreview" src="./img/iii.jpg" class="media-preview" title="点击更换图片">
           </div>
           <!-- 隐藏的封面图片选择器 -->
           <input type="file" id="coverImageFile" accept="image/*" class="hidden">
@@ -796,7 +796,7 @@
                     imageBlob = customCoverImageBlob;
                 } else {
                     statusEl.textContent = "正在获取默认图片...";
-                    const imageResp = await fetch('https://pic2.ziyuan.wang/user/miss/2025/04/hifini_103fcd33918c1.png');
+                    const imageResp = await fetch('./img/iii.jpg');
                     imageBlob = await imageResp.blob();
                 }
                 
